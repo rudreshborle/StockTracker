@@ -12,25 +12,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+bot_app = None
+monitor_task = None
 
-async def main_async():
+
+async def start_services():
+    global bot_app, monitor_task
     logger.info("Initializing database...")
     await init_db()
     logger.info("Database ready.")
 
     # Build the Telegram Bot application
-    app = build_app()
+    bot_app = build_app()
 
     # Initialize the application, updater, and start polling asynchronously
-    await app.initialize()
-    await app.updater.start_polling()
-    await app.start()
+    await bot_app.initialize()
+    await bot_app.updater.start_polling()
+    await bot_app.start()
     logger.info("Blinkit Stock Bot Polling Started.")
 
     # Spawn the background stock monitoring task in the event loop
     monitor_task = asyncio.create_task(monitor_loop())
     logger.info("Background monitor loop started.")
 
+
+async def stop_services():
+    global bot_app, monitor_task
+    logger.info("Shutting down bot and cleaning up...")
+    if monitor_task:
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
+    if bot_app:
+        await bot_app.updater.stop()
+        await bot_app.stop()
+        await bot_app.shutdown()
+    logger.info("Shutdown complete.")
+
+
+async def main_async():
+    await start_services()
     try:
         # Keep the program running
         while True:
@@ -38,17 +61,7 @@ async def main_async():
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Stopping application...")
     finally:
-        # Perform clean shutdown of bot resources
-        logger.info("Shutting down bot and cleaning up...")
-        monitor_task.cancel()
-        try:
-            await monitor_task
-        except asyncio.CancelledError:
-            pass
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
-        logger.info("Shutdown complete.")
+        await stop_services()
 
 
 def main():
