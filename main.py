@@ -36,6 +36,8 @@ async def start_services(use_webhook=False, webhook_url=None, secret_token=None)
             logger.info("storage.json successfully written from environment variable.")
         except Exception as e:
             logger.error(f"Failed to decode BLINKIT_STORAGE: {e}")
+    else:
+        logger.warning("BLINKIT_STORAGE environment variable not found. Browser session may require login.")
 
     logger.info("Initializing database...")
     await init_db()
@@ -52,12 +54,15 @@ async def start_services(use_webhook=False, webhook_url=None, secret_token=None)
         await bot_app.bot.set_webhook(
             url=webhook_url,
             secret_token=secret_token,
-            drop_pending_updates=True
+            drop_pending_updates=False
         )
+        logger.info("Webhook mode enabled")
     else:
+        # Clean up any existing webhooks before starting polling
+        await bot_app.bot.delete_webhook(drop_pending_updates=False)
         # Start polling asynchronously
         await bot_app.updater.start_polling()
-        logger.info("Blinkit Stock Bot Polling Started.")
+        logger.info("Polling mode enabled")
         
     await bot_app.start()
 
