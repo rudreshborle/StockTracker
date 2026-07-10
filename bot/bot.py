@@ -55,6 +55,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Available commands:\n"
         "📋 /list - Show all currently tracked products\n"
         "❌ /remove <id> - Stop tracking a product\n"
+        "🔄 /reload - Reload the browser context manually\n"
         "📊 /health - Check system health diagnostics\n"
         "🔑 /loginstatus - View Blinkit session status details"
     )
@@ -131,6 +132,12 @@ async def handle_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     browser_status = "Healthy" if stats["browser_healthy"] else "⚠️ Unhealthy"
     session_status = "Valid" if session_manager.is_valid() else "⚠️ Expired"
 
+    try:
+        with open("VERSION", "r", encoding="utf-8") as f:
+            v = f.read().strip()
+    except Exception:
+        v = "1.0.0"
+
     health_msg = (
         f"✅ *Blinkit Stock Bot*\n\n"
         f"*Status:* {stats['status']}\n"
@@ -139,7 +146,8 @@ async def handle_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"*Browser:*\n{browser_status}\n\n"
         f"*Session:*\n{session_status}\n\n"
         f"*Last Login:*\n{get_last_login_info()}\n\n"
-        f"*Next Check:*\n{next_check_str}"
+        f"*Next Check:*\n{next_check_str}\n\n"
+        f"*Version:*\n{v}"
     )
     await update.message.reply_text(health_msg, parse_mode="Markdown")
 
@@ -158,6 +166,23 @@ async def handle_loginstatus(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"*Browser*\n{browser_status}"
     )
     await update.message.reply_text(status_msg, parse_mode="Markdown")
+
+
+async def handle_reload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user.username or update.effective_user.first_name
+    logger.info(f"User '{user}' invoked /reload command.")
+    status_msg = await update.message.reply_text("🔄 Reloading browser context...")
+    try:
+        from blinkit.browser import BrowserManager
+        bm = BrowserManager()
+        await bm.init()
+        session_manager.restore()
+        stats["session_valid"] = True
+        await status_msg.edit_text("✅ Browser context reloaded and session restored.")
+        logger.info(f"Context reloaded successfully for user '{user}'.")
+    except Exception as e:
+        logger.error(f"Failed to reload context: {e}")
+        await status_msg.edit_text(f"❌ Failed to reload browser context: {e}")
 
 
 async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,5 +252,6 @@ def build_app():
     app.add_handler(CommandHandler("remove", handle_remove))
     app.add_handler(CommandHandler("health", handle_health))
     app.add_handler(CommandHandler("loginstatus", handle_loginstatus))
+    app.add_handler(CommandHandler("reload", handle_reload))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_link))
     return app

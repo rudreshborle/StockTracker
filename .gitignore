@@ -9,11 +9,11 @@ env/
 .vscode/
 .idea/
 
-# Local session and database (storage.json removed so it is included in deployment)
+# Local session and database
+storage.json
 last_login.json
 blinkit.db
 
 # Diagnostic screenshots and errors
 errors/
 *.png
-storage.json

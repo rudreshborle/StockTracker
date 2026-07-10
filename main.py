@@ -1,3 +1,5 @@
+import os
+import base64
 import asyncio
 import logging
 from database.database import init_db
@@ -12,12 +14,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress verbose getUpdates and external http logs
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+
 bot_app = None
 monitor_task = None
 
 
 async def start_services():
     global bot_app, monitor_task
+    
+    # Base64 decode BLINKIT_STORAGE if it is set in environment variables
+    storage_env = os.environ.get("BLINKIT_STORAGE")
+    if storage_env:
+        logger.info("Decoding BLINKIT_STORAGE environment variable into storage.json...")
+        try:
+            decoded_data = base64.b64decode(storage_env.strip())
+            with open("storage.json", "wb") as f:
+                f.write(decoded_data)
+            logger.info("storage.json successfully written from environment variable.")
+        except Exception as e:
+            logger.error(f"Failed to decode BLINKIT_STORAGE: {e}")
+
     logger.info("Initializing database...")
     await init_db()
     logger.info("Database ready.")

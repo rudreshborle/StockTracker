@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     global startup_time
     startup_time = time.time()
     
-    # Start the database, bot polling, and background monitor loop
+    # Start database, bot polling, and background monitor loop
     await start_services()
     
     yield
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"status": "Blinkit Stock Bot Running"}
 
@@ -36,6 +36,16 @@ async def root():
 @app.get("/ping")
 async def ping():
     return {"ok": True}
+
+
+@app.get("/version")
+async def version():
+    try:
+        with open("VERSION", "r", encoding="utf-8") as f:
+            v = f.read().strip()
+        return {"version": v}
+    except Exception:
+        return {"version": "1.0.0"}
 
 
 @app.get("/health")
@@ -55,11 +65,18 @@ async def health():
     
     uptime_sec = int(time.time() - startup_time) if startup_time > 0 else 0
     
+    try:
+        with open("VERSION", "r", encoding="utf-8") as f:
+            v = f.read().strip()
+    except Exception:
+        v = "1.0.0"
+    
     return {
         "status": "healthy",
         "browser": "Healthy" if browser_connected else "⚠️ Unhealthy/Offline",
         "session": "Valid" if session_manager.is_valid() else "⚠️ Expired",
         "tracked": tracked_products,
         "last_check": last_check_time,
-        "uptime": f"{uptime_sec // 60}m {uptime_sec % 60}s"
+        "uptime": f"{uptime_sec // 60}m {uptime_sec % 60}s",
+        "version": v
     }

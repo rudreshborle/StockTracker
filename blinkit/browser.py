@@ -30,10 +30,18 @@ class BrowserManager:
         except Exception:
             pass
 
-        logger.info("Launching Chromium and reloading context state...")
+        is_headless = os.getenv("HEADLESS", "false").lower() == "true"
+        launch_args = []
+        if is_headless:
+            launch_args = [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+
+        logger.info(f"Launching Chromium (headless={is_headless}, args={launch_args}) and reloading context state...")
         self.playwright = await async_playwright().start()
-        # Headless=False is used to bypass Cloudflare protection
-        self.browser = await self.playwright.chromium.launch(headless=False)
+        self.browser = await self.playwright.chromium.launch(headless=is_headless, args=launch_args)
         
         storage_path = "storage.json"
         if os.path.exists(storage_path):
