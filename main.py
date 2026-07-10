@@ -22,7 +22,7 @@ bot_app = None
 monitor_task = None
 
 
-async def start_services():
+async def start_services(use_webhook=False, webhook_url=None, secret_token=None):
     global bot_app, monitor_task
     
     # Base64 decode BLINKIT_STORAGE if it is set in environment variables
@@ -44,11 +44,22 @@ async def start_services():
     # Build the Telegram Bot application
     bot_app = build_app()
 
-    # Initialize the application, updater, and start polling asynchronously
+    # Initialize the application
     await bot_app.initialize()
-    await bot_app.updater.start_polling()
+    
+    if use_webhook and webhook_url:
+        logger.info(f"Setting Telegram Webhook to: {webhook_url}")
+        await bot_app.bot.set_webhook(
+            url=webhook_url,
+            secret_token=secret_token,
+            drop_pending_updates=True
+        )
+    else:
+        # Start polling asynchronously
+        await bot_app.updater.start_polling()
+        logger.info("Blinkit Stock Bot Polling Started.")
+        
     await bot_app.start()
-    logger.info("Blinkit Stock Bot Polling Started.")
 
     # Spawn the background stock monitoring task in the event loop
     monitor_task = asyncio.create_task(monitor_loop())
@@ -65,7 +76,8 @@ async def stop_services():
         except asyncio.CancelledError:
             pass
     if bot_app:
-        await bot_app.updater.stop()
+        if bot_app.updater and bot_app.updater.running:
+            await bot_app.updater.stop()
         await bot_app.stop()
         await bot_app.shutdown()
     logger.info("Shutdown complete.")
