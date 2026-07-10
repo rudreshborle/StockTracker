@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+.vscode/
+.idea/
+
+# Local session and database
+storage.json
+last_login.json
+blinkit.db
+
+# Diagnostic screenshots and errors
+errors/
+*.png
