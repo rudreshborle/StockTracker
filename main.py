@@ -2,6 +2,8 @@ import os
 import base64
 import asyncio
 import logging
+import shutil
+from pathlib import Path
 from database.database import init_db
 from bot.bot import build_app
 from scheduler.monitor import monitor_loop
@@ -25,19 +27,40 @@ monitor_task = None
 async def start_services(use_webhook=False, webhook_url=None, secret_token=None):
     global bot_app, monitor_task
     
-    # Base64 decode BLINKIT_STORAGE if it is set in environment variables
-    storage_env = os.environ.get("BLINKIT_STORAGE")
-    if storage_env:
-        logger.info("Decoding BLINKIT_STORAGE environment variable into storage.json...")
-        try:
-            decoded_data = base64.b64decode(storage_env.strip())
-            with open("storage.json", "wb") as f:
-                f.write(decoded_data)
-            logger.info("storage.json successfully written from environment variable.")
-        except Exception as e:
-            logger.error(f"Failed to decode BLINKIT_STORAGE: {e}")
-    else:
-        logger.warning("BLINKIT_STORAGE environment variable not found. Browser session may require login.")
+    # Locate storage session file (secret file on Render, or local project file, or environment variable)
+    secret_locations = [
+        Path("storage.json"),
+        Path("/etc/secrets/storage.json"),
+    ]
+    
+    storage_found = False
+    for path in secret_locations:
+        if path.exists():
+            logger.info(f"Using storage file found at: {path}")
+            if path.name != "storage.json" or path.resolve() != Path("storage.json").resolve():
+                try:
+                    shutil.copy(path, "storage.json")
+                    logger.info("Copied storage file to project root.")
+                except Exception as e:
+                    logger.error(f"Failed to copy storage file: {e}")
+            storage_found = True
+            break
+            
+    if not storage_found:
+        storage_env = os.environ.get("BLINKIT_STORAGE")
+        if storage_env:
+            logger.info("Decoding BLINKIT_STORAGE environment variable into storage.json...")
+            try:
+                decoded_data = base64.b64decode(storage_env.strip())
+                with open("storage.json", "wb") as f:
+                    f.write(decoded_data)
+                logger.info("storage.json successfully written from environment variable.")
+                storage_found = True
+            except Exception as e:
+                logger.error(f"Failed to decode BLINKIT_STORAGE: {e}")
+                
+    if not storage_found:
+        logger.warning("No Blinkit storage/session file found. Browser session may require login.")
 
     logger.info("Initializing database...")
     await init_db()
