@@ -213,19 +213,28 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     checker = StockChecker()
+
     try:
+        logger.info("STEP 1: Getting product details for %s", product_id)
         name, price = await checker.get_product_details(url)
+        logger.info("STEP 1 SUCCESS: name=%r price=%s", name, price)
+
+        logger.info("STEP 2: Checking stock for %s", product_id)
         is_in_stock, _ = await checker.is_available(url)
+        logger.info("STEP 2 SUCCESS: in_stock=%s", is_in_stock)
+
     except SessionExpiredException:
-        logger.error("Failed to add product: session expired.")
+        logger.exception("Blinkit session expired while adding %s", product_id)
         await status_msg.edit_text(
-            "⚠️ *Blinkit session expired.*\nPlease run `python blinkit/login.py` on your machine and save storage state first.",
-            parse_mode="Markdown"
+            "⚠️ Blinkit session expired.",
         )
         return
-    except Exception as e:
-        logger.error(f"Failed to add product due to error: {e}")
-        await status_msg.edit_text("❌ Failed to retrieve product details. Please try again later.")
+
+    except Exception:
+        logger.exception("Failed to process product %s", product_id)
+        await status_msg.edit_text(
+            "❌ Failed to retrieve product details. Please try again later."
+        )
         return
 
     stock_val = 1 if is_in_stock else 0
